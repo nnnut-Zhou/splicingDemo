@@ -3,4 +3,6 @@ project(TestSplicing)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(TestSplicing main.cpp)
+add_executable(TestSplicing testMain.cpp
+        MyTest.cpp
+        MyTest.h)
