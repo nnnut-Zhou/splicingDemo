@@ -5,24 +5,31 @@
 #ifndef TESTSPLICING_MYTEST_H
 #define TESTSPLICING_MYTEST_H
 #include <functional>
+#include <string>
 
 namespace lizi {
     using func_type = std::function<void(int)>;
 
     class MyTest {
     public:
-        MyTest(const int age_);
+        explicit MyTest(int age_);
 
-        MyTest() = default;
+        MyTest();
 
         MyTest(const MyTest&) = delete;
 
-        ~MyTest() = default;
+        MyTest(MyTest&&) noexcept ;
+
+        virtual ~MyTest();
 
         /**
          * Assignment operator
          */
         MyTest& operator=(const MyTest&) = delete;
+
+        MyTest& operator=(MyTest&& my_test) noexcept ;
+
+        void operator()(const std::string& s) const;
 
 
         /**
@@ -38,7 +45,20 @@ namespace lizi {
         void printAge();
 
     private:
-        int age_ = 0;
+        int age = 0;
+    };
+
+    class MyTestChild : public MyTest {
+    public:
+        explicit MyTestChild(int num_);
+
+        MyTestChild() = default;
+
+        ~MyTestChild() override;
+
+        void printNum() const;
+    private:
+        int num = 0;
     };
 
     void test(int);
@@ -46,7 +66,7 @@ namespace lizi {
     /**
      * Use function pointer as parameter
      */
-    void funcTest(func_type, int);
+    void funcTest(const func_type&, int);
 } // lizi
 
 #endif //TESTSPLICING_MYTEST_H
