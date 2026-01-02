@@ -4,14 +4,18 @@
 
 #include "DadePreprocess.h"
 #include <boost/filesystem.hpp>
+#include <numeric/numeric.h>
 #include <openMVG/exif/exif_IO_EasyExif.hpp>
 
 namespace fs = boost::filesystem;
 
 namespace dade {
     namespace preprocess {
-        DadeErr DadePOSExtractor::DadePOSGet(const std::string& image_dir, const bool has_pose_file) {
+        DadeErr DadePOSExtractor::GetPOS(
+            const std::string& image_dir,
+            const bool has_pose_file) {
             // [WARN] image_dir should be full path
+
             if (!has_pose_file) {
                 std::vector<std::string> vec_image;
                 const fs::path p(image_dir);
@@ -55,7 +59,72 @@ namespace dade {
             }
         }
 
-        long DadePOSExtractor::ExtractPOSToP(std::vector<openMVG::Mat34>& vec_P, CalibParams instric) {
+        DadeErr DadePOSExtractor::ExtractPOSToP(
+            const CalibParams& instric,
+            std::vector<openMVG::Mat34>& vec_P) {
+
+            for (const auto item: this->pos_pair_) {
+                openMVG::Vec3f plA(0, 0, 0), plV(0, 0, 0);
+                openMVG::Mat34 P;
+                ComputeP(item.first, instric, plA, plV, P);
+                vec_P.push_back(P);
+            }
+            return 0;
+        }
+
+        DadeErr DadePOSExtractor::ComputeP(
+            const int idx,
+            const CalibParams& instric,
+            openMVG::Vec3f placement_angle,
+            openMVG::Vec3f placement_vec,
+            openMVG::Mat34& P) {
+
+            const auto it = this->pos_pair_.find(idx);
+            if (it == this->pos_pair_.end()) {
+                return 1;
+            }
+            const POS& pos = it->second;
+
+            double lat = openMVG::R2D(pos.latitude);
+            double lon = openMVG::R2D(pos.longitude);
+            double alt = pos.altitude;
+            double roll = openMVG::R2D(pos.roll);
+            double pitch = openMVG::R2D(pos.pitch);
+            double yaw = openMVG::R2D(pos.yaw);
+
+            using namespace Eigen;
+
+            Matrix3d EM;
+            EM << -sin(lon), cos(lon), 0,
+                    -sin(lat) * cos(lon), -sin(lat) * sin(lon), cos(lat),
+                    cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat);
+
+            Matrix3d EG;
+            EG << -sin(lat) * cos(lon), -sin(lon), -cos(lat) * cos(lon),
+                    -sin(lat) * sin(lon), cos(lon), -cos(lat) * sin(lon),
+                    cos(lat), 0, -sin(lat);
+
+            Matrix3d GI;
+            GI = AngleAxisd(yaw, Vector3d::UnitZ()) *
+                 AngleAxisd(pitch, Vector3d::UnitY()) *
+                 AngleAxisd(roll, Vector3d::UnitX());
+
+            Matrix3d CI;
+            CI = AngleAxisd(placement_angle(2), Vector3d::UnitZ()) *
+                 AngleAxisd(placement_angle(1), Vector3d::UnitY()) *
+                 AngleAxisd(placement_angle(0), Vector3d::UnitX());
+
+            Matrix3d IC;
+            IC << 0, -1, 0,
+                    -1, 0, 0,
+                    0, 0, -1;
+
+            Matrix3d IMMatrix = EM * EG * GI * CI * IC;
+
+            // openMVG::Vec3 cur_xyz = UAVProcessGeometry::UAVProcessGeoBLHToXYZ(lat, lon, alt);
+            // openMVG::Vec3 origin_xyz = UAVProcessGeometry::UAVProcessGeoBLHToXYZ(lat, lon, 0); // 以地面高度为原点参考
+
+
             return 0;
         }
     }

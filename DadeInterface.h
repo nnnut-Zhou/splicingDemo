@@ -28,7 +28,26 @@ namespace dade {
     public:
         POSPair pos_pair_;
 
-        virtual DadeErr DadePOSGet(const std::string& image_dir, bool has_pose_file) = 0;
+        virtual DadeErr GetPOS(const std::string& image_dir, bool has_pose_file) = 0;
+    };
+
+    class DadeGeometry : public Dade {
+    public:
+        static openMVG::Vec3 XYZToLatLon(double x, double y, double z);
+
+        static openMVG::Vec3 LatLonToXYZ(double lat, double lon, double alt);
+
+        static openMVG::Vec3 LatLonToUTM(double lat, double lon, double alt);
+
+        //web Mector
+        static openMVG::Vec3 WMTToLatLon(double x, double y, double z);
+
+        static openMVG::Vec3 LatLonToWMT(double lat, double lon, double alt);
+
+        //GCJ02
+        static bool OutOfChina(double lat, double lon);
+
+        static void LatLonToGCJ(double wgLon, double wgLat, double& mgLon, double& mgLat);
     };
 }
 
