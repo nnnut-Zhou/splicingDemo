@@ -1,0 +1,98 @@
+
+
+
+
+        DadeErr DadePOSExtractorTest::ExtractPOSToP(
+            const CalibParams& intrinsic,
+            std::vector<openMVG::Mat34>& vec_P) {
+
+            for (const auto item: this->pos_pair_) {
+                const openMVG::Vec3 plA(0, 0, 0);
+                const openMVG::Vec3 plV(0, 0, 0);
+                openMVG::Mat34 P;
+                ComputeP(item.first, intrinsic, plA, plV, P);
+                vec_P.push_back(P);
+            }
+            return 0;
+        }
+
+        DadeErr DadePOSExtractorTest::ComputeP(
+            const int idx,
+            const CalibParams& intrinsic,
+            const openMVG::Vec3& placement_angle,
+            const openMVG::Vec3& placement_vec,
+            openMVG::Mat34& P) {
+
+            const auto it = this->pos_pair_.find(idx);
+            if (it == this->pos_pair_.end()) {
+                return 1;
+            }
+            const POS& pos = it->second;
+
+            const double lat = openMVG::R2D(pos.latitude);
+            const double lon = openMVG::R2D(pos.longitude);
+            const double alt = pos.altitude;
+            const double roll = openMVG::R2D(pos.roll);
+            const double pitch = openMVG::R2D(pos.pitch);
+            const double yaw = openMVG::R2D(pos.yaw);
+
+            using namespace Eigen;
+
+            // ECEF坐标 转 ENU（东-北-天）坐标
+            Matrix3d EM;
+            EM << -sin(lon), cos(lon), 0,
+                    -sin(lat) * cos(lon), -sin(lat) * sin(lon), cos(lat),
+                    cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat);
+
+            // NED坐标 转 ECEF坐标
+            Matrix3d EG;
+            EG << -sin(lat) * cos(lon), -sin(lon), -cos(lat) * cos(lon),
+                    -sin(lat) * sin(lon), cos(lon), -cos(lat) * sin(lon),
+                    cos(lat), 0, -sin(lat);
+
+            // 机身相对于NED（北-东-地）的旋转
+            Matrix3d GI;
+            GI = AngleAxisd(yaw, Vector3d::UnitZ()) *
+                 AngleAxisd(pitch, Vector3d::UnitY()) *
+                 AngleAxisd(roll, Vector3d::UnitX());
+
+            // 相机相对于机身的旋转
+            Matrix3d CI;
+            CI = AngleAxisd(placement_angle(2), Vector3d::UnitZ()) *
+                 AngleAxisd(placement_angle(1), Vector3d::UnitY()) *
+                 AngleAxisd(placement_angle(0), Vector3d::UnitX());
+
+            // 轴向矫正
+            Matrix3d IC;
+            IC << 0, -1, 0,
+                    -1, 0, 0,
+                    0, 0, -1;
+
+            const Matrix3d IMMatrix = EM * EG * GI * CI * IC;
+
+            const openMVG::Vec3 cur_xyz = DadeGeometry::LatLonToXYZ(lat, lon, alt);
+            const openMVG::Vec3 origin_xyz = DadeGeometry::LatLonToXYZ(lat, lon, 0);
+
+            const Vector3d diff = (cur_xyz - origin_xyz);
+            const double dXs = diff.dot(EM.row(0));
+            const double dYs = diff.dot(EM.row(1));
+            const double dZs = diff.dot(EM.row(2));
+
+            Vector3d lever_arm_offset = (EG * GI) * placement_vec;
+
+            Matrix3d K;
+            K << -1, 0, intrinsic.principal_point_x,
+                    1, 1, -intrinsic.principal_point_y,
+                    0, 0, -intrinsic.principal_point_x;
+
+            const Matrix3d rot_part = IMMatrix * K;
+
+            openMVG::Vec3 utm_pos = DadeGeometry::LatLonToUTM(pos.latitude, pos.longitude, alt);
+
+            P.block<3, 3>(0, 0) = rot_part;
+            P(0, 3) = dXs + lever_arm_offset.x() + utm_pos.x();
+            P(1, 3) = dYs + lever_arm_offset.y() + utm_pos.y();
+            P(2, 3) = dZs + lever_arm_offset.z() + utm_pos.z();
+
+            return 0;
+        }

@@ -17,6 +17,9 @@ add_executable(DadeSplicing MyTestMain.cpp
         DadePreprocess.h
         DadeInterface.h
         DadeGeometry.cpp
+        DadeList.cpp
+        DadePose.cpp
+        DadePose.h
 )
 
 target_link_libraries(DadeSplicing PRIVATE
