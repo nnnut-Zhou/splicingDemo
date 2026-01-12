@@ -9,9 +9,9 @@ namespace dade {
     using DadeErr = int;
 
     struct POS {
-        double latitude = 0.0; // dB
-        double longitude = 0.0; // dL
-        double altitude = 0.0; // dH
+        double latitude = 0.0; // dB，纬度，y
+        double longitude = 0.0; // dL，经度，x
+        double altitude = 0.0; // dH，高度，z
         double roll = 0.0;
         double pitch = 0.0;
         double yaw = 0.0;
@@ -31,12 +31,12 @@ namespace dade {
             *this = {};
         }
 
-        bool IsUndefined() const {
-            return focal_length_x == 0.0 &&
-                   focal_length_y == 0.0 &&
-                   principal_point_x == 0.0 &&
-                   principal_point_y == 0.0 &&
-                   ccd_size == 0.0;
+        bool IsDefined() const {
+            return focal_length_x != 0.0 ||
+                   focal_length_y != 0.0 ||
+                   principal_point_x != 0.0 ||
+                   principal_point_y != 0.0 ||
+                   ccd_size != 0.0;
         }
     };
 

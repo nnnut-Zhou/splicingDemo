@@ -5,8 +5,11 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <openMVG/sfm/sfm_data.hpp>
-
-// #include <openMVG/sfm/sfm.hpp>
+#include <openMVG/sfm/sfm_data_io.hpp>
+#include <openMVG/sfm/sfm_data_utils.hpp>
+#include <openMVG/image/image_io.hpp>
+#include <openMVG/exif/exif_IO_EasyExif.hpp>
+#include <openMVG/cameras/cameras_io.hpp>
 
 #include "DadeInterface.h"
 
@@ -25,6 +28,7 @@ namespace dade {
         DadePose& dade_pose,
         const std::string& sfm_out
     ) {
+        // check
         const fs::path image_dir_p(image_dir);
         if (!fs::exists(image_dir_p) || !fs::is_directory(image_dir_p)) {
             std::cerr << "The input image_dir doesn't exist" << std::endl;
@@ -35,7 +39,6 @@ namespace dade {
             std::cerr << "The format of output sfm_out is invalid" << std::endl;
             return 1;
         }
-        // check the parent path of sfm_out exists, if not create it
         const fs::path sfm_out_dir_p = sfm_out_p.parent_path();
         if (!sfm_out_dir_p.empty() && !fs::exists(sfm_out_dir_p)) {
             if (!fs::create_directories(sfm_out_dir_p)) {
@@ -44,7 +47,7 @@ namespace dade {
             }
         }
 
-        // read images
+        // 读取照片
         std::vector<std::string> vec_image;
         for (const auto& entry: fs::directory_iterator(image_dir_p)) {
             if (fs::is_regular_file(entry)) {
@@ -57,27 +60,25 @@ namespace dade {
         }
         std::sort(vec_image.begin(), vec_image.end());
 
-        // sfm data declare
+        // 声明 openMVG sfm容器
         sfm::SfM_Data sfm_data;
         sfm_data.s_root_path = image_dir;
-        sfm::Views& views = sfm_data.views;
-        sfm::Intrinsics& intrinsics = sfm_data.intrinsics;
+        sfm::Views& sfm_views = sfm_data.views;
+        sfm::Intrinsics& sfm_intrinsics = sfm_data.intrinsics;
 
-        // get pos
-        bool have_no_pose = true;
+        // 获取pos
+        bool have_no_pose;
         const fs::path pos_file_p(pos_file);
         if (fs::exists(pos_file_p) && fs::is_regular_file(pos_file_p)) {
             have_no_pose = dade_pose.GetPOSFromPOSFile(pos_file);
         } else {
             have_no_pose = dade_pose.GetPOS(image_dir);
         }
-
-        // check pos's number
         if (!have_no_pose && dade_pose.pos_pair_.size() != vec_image.size()) { return 1; }
 
-        // translate origin latlon to computable coordinate
-        double center_X, center_Y, center_Z;
+        // pos转至目标坐标系
         if (!have_no_pose) {
+            double center_X, center_Y, center_Z;
             switch (coordi_list_type) {
                 case COORDI_LIST_TYPE::COORDINATE_XYZ:
                     dade_pose.ExtractXYZ(center_X, center_Y, center_Z);
@@ -92,113 +93,107 @@ namespace dade {
                     have_no_pose = true;
             }
         }
+        bool cParam_is_defined = cParam.IsDefined();
 
-        bool bCalibParam = cParam.IsUndefined();
+        // 循环读图，构造内参对象Intrinsic，更新sfm容器
+        for (size_t i = 0; i < vec_image.size(); ++i) {
+            double width, height, ppx, ppy, focal;
 
-        double width, height, ppx, ppy, focal;
-
-        POSPair::iterator pos_iter = dade_pose->posList.begin();
-        for (std::vector<std::string>::const_iterator iter_image = vec_image.begin();
-             iter_image != vec_image.end();
-             ++iter_image, ++pos_iter) {
-            ppx = ppy = width = height = focal = -1;
-
-            const std::string sImageFilename = stlplus::create_filespec(image_dir, *iter_image);
-            const std::string sImFilenamePart = stlplus::filename_part(sImageFilename);
-
-            openMVG::image::ImageHeader imgHeader;
-            if (!openMVG::image::ReadImageHeader(sImageFilename.c_str(), &imgHeader))
+            const std::string& image_name = vec_image[i];
+            const std::string full_path = (image_dir_p / image_name).string();
+            openMVG::image::ImageHeader img_header{};
+            if (!openMVG::image::ReadImageHeader(full_path.c_str(), &img_header)) {
+                std::cerr << "Cannot read image header: " << image_name;
                 continue;
-
-            width = imgHeader.width;
-            height = imgHeader.height;
+            }
+            width = img_header.width;
+            height = img_header.height;
             ppx = width / 2.0;
             ppy = height / 2.0;
-            if (bCalibParam) {
-                ppx = cParam._ppx_;
-                ppy = cParam._ppy_;
-                focal = std::max(cParam._flen_x_, cParam._flen_y_);
+
+            if (cParam_is_defined) {
+                ppx = cParam.principal_point_x;
+                ppy = cParam.principal_point_y;
+                focal = std::max(cParam.focal_length_x, cParam.focal_length_y);
             } else {
-                ppx = width / 2.0;
-                ppy = height / 2.0;
-                std::unique_ptr<openMVG::exif::Exif_IO> exifPosReader(new openMVG::exif::Exif_IO_EasyExif);
-                if (exifPosReader->open(sImageFilename))
-                    focal = std::max(width, height) * exifPosReader->getFocal() / exifPosReader->getFocal();
-                else
+                auto exif_reader = std::make_unique<openMVG::exif::Exif_IO_EasyExif>();
+                if (exif_reader->open(full_path)) {
+                    focal = exif_reader->getFocal() > 0
+                                ? exif_reader->getFocal()
+                                : std::max(width, height);
+                } else {
                     focal = std::max(width, height);
+                }
             }
 
-            std::unique_ptr<openMVG::exif::Exif_IO> exifReader(new openMVG::exif::Exif_IO_EasyExif);
-            exifReader->open(sImageFilename);
-            focal = std::max(width, height);
-
-            std::shared_ptr<openMVG::cameras::IntrinsicBase> intrinsic(NULL);
-            if (focal > 0 && ppx > 0 && ppy > 0 && height > 0 && width > 0) {
-                //initial intrinsic
-                //get from openMVG
+            // 根据选择的相机模型，构造不同的Intrinsic
+            std::shared_ptr<openMVG::cameras::IntrinsicBase> intrinsic_ptr = nullptr;
+            if (focal > 0) {
                 switch (camera_model_type) {
-                    case PINHOLE_CAMERA:
-                        intrinsic = std::make_shared<openMVG::cameras::Pinhole_Intrinsic>
-                                (width, height, focal, ppx, ppy);
+                    case EINTRINSIC::PINHOLE_CAMERA:
+                        intrinsic_ptr = std::make_shared<openMVG::cameras::Pinhole_Intrinsic>(
+                            width, height, focal, ppx, ppy);
                         break;
-                    case PINHOLE_CAMERA_RADIAL1:
-                        intrinsic = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Radial_K1>
-                                (width, height, focal, ppx, ppy, 0.0); // setup no distortion as initial guess
+                    case EINTRINSIC::PINHOLE_CAMERA_RADIAL1:
+                        intrinsic_ptr = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Radial_K1>(
+                            width, height, focal, ppx, ppy, 0.0);
                         break;
-                    case PINHOLE_CAMERA_RADIAL3:
-                        intrinsic = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Radial_K3>
-                                (width, height, focal, ppx, ppy, 0.0, 0.0, 0.0); // setup no distortion as initial guess
+                    case EINTRINSIC::PINHOLE_CAMERA_RADIAL3:
+                        intrinsic_ptr = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Radial_K3>(
+                            width, height, focal, ppx, ppy, 0.0, 0.0, 0.0);
                         break;
-                    case PINHOLE_CAMERA_BROWN:
-                        intrinsic = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Brown_T2>
-                                (width, height, focal, ppx, ppy, 0.0, 0.0, 0.0, 0.0, 0.0);
-                        // setup no distortion as initial guess
+                    case EINTRINSIC::PINHOLE_CAMERA_BROWN:
+                        intrinsic_ptr = std::make_shared<openMVG::cameras::Pinhole_Intrinsic_Brown_T2>(
+                            width, height, focal, ppx, ppy, 0.0, 0.0, 0.0, 0.0, 0.0);
                         break;
                     default:
-                        std::cerr << "Error: unknown camera model: " << (int) camera_model_type << std::endl;
+                        std::cerr << "Unknown camera model type";
                         return 1;
                 }
             }
 
-            if (have_no_pose) {
-                View v(*iter_image, views.size(), views.size(), views.size(), width, height);
-                if (intrinsic == NULL)
-                    v.id_intrinsic = openMVG::UndefinedIndexT;
-                else
-                    intrinsics[v.id_intrinsic] = intrinsic;
-                // Add the view to the sfm_container
-                views[v.id_view] = std::make_shared<View>(v);
-            } else {
-                ViewPriors v(*iter_image, views.size(), views.size(), views.size(), width, height);
-                // Add intrinsic related to the image (if any)
-                if (intrinsic == NULL)
-                    v.id_intrinsic = openMVG::UndefinedIndexT;
-                else
-                    intrinsics[v.id_intrinsic] = intrinsic;
+            const uint32_t id_view = static_cast<uint32_t>(i);
+            const uint32_t id_intrinsic = (intrinsic_ptr != nullptr) ? id_view : openMVG::UndefinedIndexT;
 
-                // Add the view to the sfm_container
-                views[v.id_view] = std::make_shared<View>(v);
-                v.b_use_pose_center_ = true;
-                double x = pos_iter->second.dL;
-                double y = pos_iter->second.dB;
-                double z = pos_iter->second.dH;
-                v.pose_center_ = openMVG::Vec3(x, y, z);
-                views[v.id_view] = std::make_shared<ViewPriors>(v);
+            // 构造View，并绑定id放入sfm容器
+            if (have_no_pose) {
+                auto v = std::make_shared<sfm::View>(
+                    image_name, id_view, id_intrinsic, id_view, width, height);
+                sfm_views[id_view] = v;
+            } else {
+                // ViewPriors继承View，多了先验位姿信息（pos）
+                auto v_prior = std::make_shared<sfm::ViewPriors>(
+                    image_name, id_view, id_intrinsic, id_view, width, height);
+                auto it_pos = dade_pose.pos_pair_.find(i);
+                if (it_pos != dade_pose.pos_pair_.end()) {
+                    // gps先验标记为可用
+                    v_prior->b_use_pose_center_ = true;
+                    // 另一个b_use_pose_rotation_是旋转姿态先验标记
+                    // 测试集的云台角度误差较大，故不使用
+                    v_prior->pose_center_ = openMVG::Vec3(
+                        it_pos->second.longitude, it_pos->second.latitude, it_pos->second.altitude);
+                }
+                sfm_views[id_view] = v_prior;
             }
 
+            if (intrinsic_ptr) {
+                sfm_intrinsics[id_intrinsic] = intrinsic_ptr;
+            }
         }
 
-        //group camera that share common properties
-        //make BS more stable and faster
+        // 相机内参分组合并，同一台相机的多个内参会合并成一个，加速并提高稳定性
         if (group_camera_model) {
             openMVG::sfm::GroupSharedIntrinsics(sfm_data);
         }
 
+        // 写入到文件
+        // flags_part可指定保存sfm容器的哪些信息
         if (!Save(
             sfm_data,
             sfm_out.c_str(),
-            ESfM_Data(VIEWS | INTRINSICS))) {
-            return 3;
+            static_cast<sfm::ESfM_Data>(
+                sfm::ESfM_Data::VIEWS | sfm::ESfM_Data::INTRINSICS))) {
+            return 1;
         }
 
         return 0;

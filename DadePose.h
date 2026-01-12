@@ -17,10 +17,10 @@ namespace dade {
         DadeErr GetPOS(const std::string& image_dir) override;
 
         // TODO not implemented yet
-        DadeErr GetPOSFromPOSFile(const std::string& pose_file) override { return 0; };
+        DadeErr GetPOSFromPOSFile(const std::string& pose_file) override { return 1; };
 
         // TODO not implemented yet
-        DadeErr ExportPOS(const std::string& output_file) override { return 0; };
+        DadeErr ExportPOS(const std::string& output_file) override { return 1; };
     };
 
     // simple project to ground, just for test

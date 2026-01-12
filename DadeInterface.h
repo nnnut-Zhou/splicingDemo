@@ -67,7 +67,7 @@ namespace dade {
 
     class DadeList : public Dade {
     public:
-        DadeErr GetList(
+        static DadeErr GetList(
             const std::string& image_dir,
             const std::string& pos_file,
             CalibParams& cParam,
