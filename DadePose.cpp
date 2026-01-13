@@ -10,7 +10,7 @@
 namespace fs = boost::filesystem;
 
 namespace dade {
-    DadeErr DadePOSExtractor::GetPOS(const std::string& image_dir) {
+    DadeErr DadePose::ExtractPOS(const std::string& image_dir) {
         std::vector<std::string> vec_image;
         const fs::path p(image_dir);
         if (!fs::exists(p) || !fs::is_directory(p)) {
@@ -49,7 +49,15 @@ namespace dade {
         return 0;
     }
 
-    DadeErr DadePose::ExtractUTM(double& center_x, double& center_y, double& center_z) {
+    DadeErr DadePose::ExtractPOSFromPOSFile(const std::string& pose_file) {
+        return 1;
+    }
+
+    DadeErr DadePose::ExportPOS(const std::string& output_file) {
+        return 1;
+    }
+
+    DadeErr DadePose::TransToUTM(double& center_x, double& center_y, double& center_z) {
         const size_t size = pos_pair_.size();
         if (size == 0)
             return 1;
@@ -76,7 +84,7 @@ namespace dade {
         return 0;
     }
 
-    DadeErr DadePose::ExtractXYZ(double& center_x, double& center_y, double& center_z) {
+    DadeErr DadePose::TransToXYZ(double& center_x, double& center_y, double& center_z) {
         const size_t size = pos_pair_.size();
         if (size == 0)
             return 1;
@@ -103,7 +111,7 @@ namespace dade {
         return 0;
     }
 
-    DadeErr DadePose::ExtractLocalUTM(double& center_x, double& center_y, double& center_z) {
+    DadeErr DadePose::TransToLocalUTM(double& center_x, double& center_y, double& center_z) {
         const size_t size = pos_pair_.size();
         if (size == 0)
             return 1;
@@ -127,7 +135,7 @@ namespace dade {
         center_y /= d_size;
         center_z /= d_size;
 
-        for (auto& iter : pos_pair_) {
+        for (auto& iter: pos_pair_) {
             iter.second.longitude -= center_x;
             iter.second.latitude -= center_y;
             // iter.second.altitude -= center_z;

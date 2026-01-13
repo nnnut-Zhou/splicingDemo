@@ -40,7 +40,7 @@ namespace dade {
         }
     };
 
-    // camera model
+    // 相机模型
     // copied from openMVG, with fisheye and spherical removed
     enum class EINTRINSIC : int {
         PINHOLE_CAMERA_START = 0,

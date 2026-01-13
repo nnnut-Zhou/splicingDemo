@@ -24,6 +24,7 @@ add_executable(DadeSplicing MyTestMain.cpp
         DadeList.cpp
         DadePose.cpp
         DadePose.h
+        DadeCameraDB.cpp
 )
 
 target_link_libraries(DadeSplicing PRIVATE

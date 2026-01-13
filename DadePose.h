@@ -12,20 +12,12 @@
 #include "DadeInterface.h"
 
 namespace dade {
-    class DadePOSExtractor : public DadePose {
+
+    // 测试用pos提取器，可作为由pos直接投影的入口
+    class DadePOSExtractorTest : public DadePose {
     public:
-        DadeErr GetPOS(const std::string& image_dir) override;
+        ~DadePOSExtractorTest() override = default;
 
-        // TODO not implemented yet
-        DadeErr GetPOSFromPOSFile(const std::string& pose_file) override { return 1; };
-
-        // TODO not implemented yet
-        DadeErr ExportPOS(const std::string& output_file) override { return 1; };
-    };
-
-    // simple project to ground, just for test
-    class DadePOSExtractorTest : public DadePOSExtractor {
-    public:
         DadeErr ExtractPOSToP(const CalibParams& intrinsic, std::vector<openMVG::Mat34>& vec_P);
 
         DadeErr ComputeP(int idx, const CalibParams& intrinsic, const openMVG::Vec3& placement_angle,

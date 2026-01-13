@@ -7,6 +7,9 @@
 #include <iostream>
 #include <map>
 #include <ostream>
+#include <openMVG/numeric/eigen_alias_definition.hpp>
+#include <utility>
+#include <sfm/sfm_data.hpp>
 
 #include "common.h"
 
@@ -24,6 +27,8 @@ namespace dade {
 
     class DadeGeometry : public Dade {
     public:
+        ~DadeGeometry() override = default;
+
         // WGS84: ECEF to lat-lon
         static openMVG::Vec3 XYZToLatLon(double x, double y, double z);
 
@@ -43,48 +48,120 @@ namespace dade {
         static void LatLonToGCJ(double wgLon, double wgLat, double& mgLon, double& mgLat);
     };
 
-    class DadePose : public Dade {
+    // 单例
+    class DadeCameraDB : public Dade {
+    private:
+        bool is_loaded_ = false;
+
+        std::map<std::string, double> database_{};
+
+        // 防止外界创建
+        DadeCameraDB() = default;
+
+        // 防止外界删除
+        ~DadeCameraDB() override = default;
+
     public:
-        POSPair pos_pair_;
+        static DadeCameraDB& getInstance() {
+            static DadeCameraDB instance;
+            return instance;
+        }
 
-        virtual DadeErr GetPOS(const std::string& image_dir) = 0;
+        DadeCameraDB(const DadeCameraDB&) = delete;
 
-        virtual DadeErr GetPOSFromPOSFile(const std::string& pose_file) = 0;
+        DadeCameraDB& operator=(const DadeCameraDB&) = delete;
 
-        virtual DadeErr ExportPOS(const std::string& output_file) = 0;
+        bool load(const std::string& dbPath);
+
+        bool getSensorWidth(const std::string& model, double& width) const;
+    };
+
+    class DadePose : public Dade {
+    private:
+        POSPair pos_pair_{};
+
+    public:
+        ~DadePose() override = default;
+
+        // 显式提供move
+        DadePose(DadePose&&) = default;
+
+        DadePose& operator=(DadePose&&) = default;
+
+        // 禁止拷贝
+        DadePose(const DadePose&) = delete;
+
+        DadePose& operator=(const DadePose&) = delete;
+
+        DadePose() = default;
+
+        explicit DadePose(const std::string& image_dir) {
+            ExtractPOS(image_dir);
+        }
+
+        const POSPair& GetPosPair() {
+            return pos_pair_;
+        }
+
+        DadeErr ExtractPOS(const std::string& image_dir);
+
+        // TODO not implemented yet
+        DadeErr ExtractPOSFromPOSFile(const std::string& pose_file);
+
+        // TODO not implemented yet
+        DadeErr ExportPOS(const std::string& output_file);
 
         // return center of UTM && translate all pos to UTM
-        DadeErr ExtractUTM(double& center_x, double& center_y, double& center_z);
+        DadeErr TransToUTM(double& center_x, double& center_y, double& center_z);
 
         // return center of ECEF && translate all pos to ECEF
-        DadeErr ExtractXYZ(double& center_x, double& center_y, double& center_z);
+        DadeErr TransToXYZ(double& center_x, double& center_y, double& center_z);
 
         // return center of UTM
         // translate all pos from latlon to UTM, and consider the center as the origin, except z
-        DadeErr ExtractLocalUTM(double& center_x, double& center_y, double& center_z);
+        DadeErr TransToLocalUTM(double& center_x, double& center_y, double& center_z);
     };
 
 
     class DadeList : public Dade {
+    private:
+        DadePose pose_{};
+
+        CalibParams calib_params_{};
+
+        std::string image_dir_{};
+
+        // openMVG sfm容器
+        openMVG::sfm::SfM_Data sfm_data_{};
+
     public:
-        static DadeErr GetList(
-            const std::string& image_dir,
-            const std::string& pos_file,
-            CalibParams& cParam,
+        ~DadeList() override = default;
+
+        // 显式提供move
+        DadeList(DadeList&&) = default;
+
+        DadeList& operator=(DadeList&&) = default;
+
+        // 禁止拷贝
+        DadeList(const DadeList&) = delete;
+
+        DadeList& operator=(const DadeList&) = delete;
+
+        DadeList() = default;
+
+        DadeList(
+            DadePose pose,
+            const CalibParams& cParam,
+            std::string image_dir
+        ) : pose_(std::move(pose)), calib_params_(cParam), image_dir_(std::move(image_dir)) {
+        }
+
+        DadeErr ExtractList(
             bool group_camera_model,
             EINTRINSIC camera_model_type,
             COORDI_LIST_TYPE coordi_list_type,
-            DadePose& dade_pose,
             const std::string& sfm_out
         );
-
-        // virtual DadeErr UAVProcessListRange(CalibParams cParam, POSPair posList) {
-        //     return 0;
-        // }
-        //
-        // virtual double UAVProcessListSize(std::string dImage) {
-        //     return 0;
-        // };
     };
 }
 
