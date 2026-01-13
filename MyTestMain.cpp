@@ -1,5 +1,4 @@
 #include <iostream>
-#include <openMVG/numeric/eigen_alias_definition.hpp>
 #include <boost/filesystem.hpp>
 
 #include "DadePose.h"

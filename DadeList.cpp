@@ -152,7 +152,7 @@ namespace dade {
                 }
             }
 
-            const uint32_t id_view = static_cast<uint32_t>(i);
+            const auto id_view = static_cast<uint32_t>(i);
             const uint32_t id_intrinsic = (intrinsic_ptr != nullptr) ? id_view : openMVG::UndefinedIndexT;
 
             // 构造View，并绑定id放入sfm容器
@@ -164,7 +164,7 @@ namespace dade {
                 // ViewPriors继承View，多了先验位姿信息（pos）
                 auto v_prior = std::make_shared<sfm::ViewPriors>(
                     image_name, id_view, id_intrinsic, id_view, width, height);
-                auto it_pos = dade_pose.pos_pair_.find(i);
+                auto it_pos = dade_pose.pos_pair_.find(static_cast<int>(i));
                 if (it_pos != dade_pose.pos_pair_.end()) {
                     // gps先验标记为可用
                     v_prior->b_use_pose_center_ = true;

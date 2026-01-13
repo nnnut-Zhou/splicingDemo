@@ -61,8 +61,8 @@ namespace dade {
             openMVG::Vec3 utm = DadeGeometry::LatLonToUTM(
                 iter.second.latitude, iter.second.longitude, iter.second.altitude
             );
-            iter.second.latitude = utm(0);
-            iter.second.longitude = utm(1);
+            iter.second.longitude = utm(0);
+            iter.second.latitude = utm(1);
             iter.second.altitude = utm(2);
             center_x += utm(0);
             center_y += utm(1);
@@ -88,8 +88,8 @@ namespace dade {
             openMVG::Vec3 xyz = DadeGeometry::LatLonToXYZ(
                 iter.second.latitude, iter.second.longitude, iter.second.altitude
             );
-            iter.second.latitude = xyz(0);
-            iter.second.longitude = xyz(1);
+            iter.second.longitude = xyz(0);
+            iter.second.latitude = xyz(1);
             iter.second.altitude = xyz(2);
             center_x += xyz(0);
             center_y += xyz(1);
@@ -115,8 +115,8 @@ namespace dade {
             openMVG::Vec3 utm = DadeGeometry::LatLonToUTM(
                 iter.second.latitude, iter.second.longitude, iter.second.altitude
             );
-            iter.second.latitude = utm(0);
-            iter.second.longitude = utm(1);
+            iter.second.longitude = utm(0);
+            iter.second.latitude = utm(1);
             iter.second.altitude = utm(2);
             center_x += utm(0);
             center_y += utm(1);
@@ -128,8 +128,8 @@ namespace dade {
         center_z /= d_size;
 
         for (auto& iter : pos_pair_) {
-            iter.second.latitude -= center_x;
-            iter.second.longitude -= center_y;
+            iter.second.longitude -= center_x;
+            iter.second.latitude -= center_y;
             // iter.second.altitude -= center_z;
         }
 

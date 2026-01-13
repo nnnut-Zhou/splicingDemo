@@ -33,7 +33,6 @@ target_link_libraries(DadeSplicing PRIVATE
         openMVG_easyexif
         openMVG_sfm
         openMVG_image
-
         openMVG_stlplus
         ${JPEG_LIBRARIES}
         ${PNG_LIBRARIES}
