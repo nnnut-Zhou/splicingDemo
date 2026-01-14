@@ -7,9 +7,9 @@
 #include <iostream>
 #include <map>
 #include <ostream>
-#include <openMVG/numeric/eigen_alias_definition.hpp>
 #include <utility>
-#include <sfm/sfm_data.hpp>
+#include <openMVG/numeric/eigen_alias_definition.hpp>
+#include <openMVG/sfm/sfm_data.hpp>
 
 #include "common.h"
 
@@ -162,7 +162,49 @@ namespace dade {
             COORDI_LIST_TYPE coordi_list_type,
             const std::string& sfm_out
         );
+
+        // TODO extract list from file
+        DadeErr ExtractList() { return 1; }
+
     };
+
+    class DadeFeature : public Dade {
+    private:
+        std::map<int, FeatureParams> features_{};
+
+        DadeList dade_list_{};
+
+        // TODO ====== 由已有数据填features_ ======
+        void init();
+
+    public:
+        ~DadeFeature() override = default;
+
+        // 显式提供move
+        DadeFeature(DadeFeature&&) = default;
+
+        DadeFeature& operator=(DadeFeature&&) = default;
+
+        // 禁止拷贝
+        DadeFeature(const DadeFeature&) = delete;
+
+        DadeFeature& operator=(const DadeFeature&) = delete;
+
+        DadeFeature() = default;
+
+        explicit DadeFeature(DadeList dade_list) : dade_list_(std::move(dade_list)) {
+            init();
+        }
+
+        // TODO init from file
+        explicit DadeFeature(std::string& sfm_path) {
+            init();
+        }
+
+
+    };
+
+
 }
 
 #endif //DADESPLICING_DADEINTERFACE_H

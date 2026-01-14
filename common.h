@@ -5,6 +5,8 @@
 #ifndef DADESPLICING_COMMON_H
 #define DADESPLICING_COMMON_H
 
+#include <map>
+
 namespace dade {
     using DadeErr = int;
 
@@ -38,6 +40,12 @@ namespace dade {
                    principal_point_y != 0.0 ||
                    ccd_size != 0.0;
         }
+    };
+
+    struct FeatureParams {
+        std::string image_in{};
+        std::string feature_out{};
+        std::string descs_out{};
     };
 
     // 相机模型
